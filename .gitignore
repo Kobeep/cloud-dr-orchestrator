@@ -27,6 +27,19 @@ go.work.sum
 # env file
 .env
 
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform/
+.terraform.lock.hcl
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
 # Editor/IDE
 # .idea/
 # .vscode/
