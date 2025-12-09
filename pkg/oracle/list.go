@@ -34,9 +34,13 @@ func (c *Client) ListObjects(ctx context.Context, prefix string) ([]ObjectInfo, 
 	for _, obj := range response.Objects {
 		if obj.Name != nil {
 			info := ObjectInfo{
-				Name:         *obj.Name,
-				Size:         *obj.Size,
-				LastModified: obj.TimeModified.Time,
+				Name: *obj.Name,
+			}
+			if obj.Size != nil {
+				info.Size = *obj.Size
+			}
+			if obj.TimeModified != nil {
+				info.LastModified = obj.TimeModified.Time
 			}
 			if obj.Etag != nil {
 				info.ETag = *obj.Etag
