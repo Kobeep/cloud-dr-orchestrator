@@ -3,6 +3,7 @@ package oracle
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/oracle/oci-go-sdk/v65/common"
 	"github.com/oracle/oci-go-sdk/v65/objectstorage"
@@ -33,7 +34,11 @@ func NewClient(config Config) (*Client, error) {
 
 	// Try to load from config file first
 	if config.ConfigFilePath == "" {
-		config.ConfigFilePath = common.DefaultConfigFilePath()
+		// Use default OCI config location: ~/.oci/config
+		homeDir, err := os.UserHomeDir()
+		if err == nil {
+			config.ConfigFilePath = homeDir + "/.oci/config"
+		}
 	}
 	if config.Profile == "" {
 		config.Profile = "DEFAULT"
