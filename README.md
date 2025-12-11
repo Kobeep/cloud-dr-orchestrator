@@ -70,6 +70,28 @@ orchestrator download \
   --compartment ocid1.compartment.oc1..xxx
 ```
 
+**5. Restore from local backup:**
+```bash
+orchestrator restore \
+  --file backup-20251209-092658.tar.gz \
+  --db-name mydb \
+  --db-host localhost \
+  --db-user postgres \
+  --db-password secret
+```
+
+**6. Restore directly from cloud:**
+```bash
+orchestrator restore \
+  --from-cloud backups/2025/12/backup-20251209-092658.tar.gz \
+  --bucket cloud-dr-orchestrator-dr-backups \
+  --compartment ocid1.compartment.oc1..xxx \
+  --db-name mydb \
+  --db-host localhost \
+  --db-user postgres \
+  --db-password secret
+```
+
 ## Configuration
 
 ### Oracle Cloud Credentials
@@ -152,13 +174,11 @@ psql myapp < backup-20251209-104235.sql
   - Automatic folder organization (backups/YYYY/MM/)
   - Tested with real OCI bucket ✓
 
-### In Progress
-- ⏳ **Issue #5**: Restore functionality
-  - Automated restore from backup
-  - Database recreation
-
-- ⏳ **Issue #6**: Automated scheduling
-  - Cron integration
+- ✅ **Issue #7**: Restore functionality
+  - Restore from local .tar.gz backups
+  - Download from cloud and restore
+  - Confirmation prompt before restore
+  - Support for target database override
   - Backup retention policies
 
 - ⏳ **Issue #7**: Monitoring and metrics
