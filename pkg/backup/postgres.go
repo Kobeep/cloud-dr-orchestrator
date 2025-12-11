@@ -168,3 +168,125 @@ func compressTarGz(inputPath, outputPath string) error {
 
 	return nil
 }
+
+// RestorePostgres restores a PostgreSQL database from a .tar.gz backup
+func RestorePostgres(config PostgresConfig, backupFile string, targetDB string) error {
+	fmt.Printf("Starting restore from backup: %s\n", backupFile)
+
+	// Create temporary directory for extraction
+	tempDir, err := os.MkdirTemp("", "pg-restore-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Step 1: Extract .tar.gz
+	fmt.Printf("Extracting backup file...\n")
+	sqlFile, err := extractTarGz(backupFile, tempDir)
+	if err != nil {
+		return fmt.Errorf("extraction failed: %w", err)
+	}
+	fmt.Printf("Extracted: %s\n", sqlFile)
+
+	// Override target database if specified
+	if targetDB != "" {
+		config.Database = targetDB
+	}
+
+	// Step 2: Restore to PostgreSQL
+	fmt.Printf("Restoring to database '%s'...\n", config.Database)
+	if err := runPsqlRestore(config, sqlFile); err != nil {
+		return fmt.Errorf("restore failed: %w", err)
+	}
+
+	fmt.Printf("✅ Restore completed successfully!\n")
+	fmt.Printf("   Database: %s\n", config.Database)
+	fmt.Printf("   From: %s\n", backupFile)
+
+	return nil
+}
+
+// extractTarGz extracts a .tar.gz file and returns the path to the extracted SQL file
+func extractTarGz(tarGzPath, destDir string) (string, error) {
+	// Open the tar.gz file
+	file, err := os.Open(tarGzPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open tar.gz file: %w", err)
+	}
+	defer file.Close()
+
+	// Create gzip reader
+	gzipReader, err := gzip.NewReader(file)
+	if err != nil {
+		return "", fmt.Errorf("failed to create gzip reader: %w", err)
+	}
+	defer gzipReader.Close()
+
+	// Create tar reader
+	tarReader := tar.NewReader(gzipReader)
+
+	var extractedFile string
+
+	// Extract files
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return "", fmt.Errorf("failed to read tar header: %w", err)
+		}
+
+		// Construct output path
+		targetPath := filepath.Join(destDir, filepath.Base(header.Name))
+
+		// Only extract regular files (skip directories)
+		if header.Typeflag == tar.TypeReg {
+			outFile, err := os.Create(targetPath)
+			if err != nil {
+				return "", fmt.Errorf("failed to create output file: %w", err)
+			}
+
+			if _, err := io.Copy(outFile, tarReader); err != nil {
+				outFile.Close()
+				return "", fmt.Errorf("failed to extract file: %w", err)
+			}
+			outFile.Close()
+
+			extractedFile = targetPath
+			fmt.Printf("  Extracted: %s (%.2f MB)\n", filepath.Base(targetPath), float64(header.Size)/1024/1024)
+		}
+	}
+
+	if extractedFile == "" {
+		return "", fmt.Errorf("no files found in archive")
+	}
+
+	return extractedFile, nil
+}
+
+// runPsqlRestore executes psql command to restore database
+func runPsqlRestore(config PostgresConfig, sqlFilePath string) error {
+	// Set PGPASSWORD environment variable
+	env := os.Environ()
+	if config.Password != "" {
+		env = append(env, fmt.Sprintf("PGPASSWORD=%s", config.Password))
+	}
+
+	// Build psql command
+	args := []string{
+		"-h", config.Host,
+		"-p", fmt.Sprintf("%d", config.Port),
+		"-U", config.User,
+		"-d", config.Database,
+		"-f", sqlFilePath,
+		"--echo-errors",
+	}
+
+	cmd := exec.Command("psql", args...)
+	cmd.Env = env
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
+}
