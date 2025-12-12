@@ -9,48 +9,48 @@ CONFIG_DIR="/etc/cloud-dr-orchestrator"
 WORK_DIR="/opt/cloud-dr-orchestrator"
 SYSTEMD_DIR="/etc/systemd/system"
 
-echo "🚀 Cloud DR Orchestrator - Automated Backup Setup"
-echo "=================================================="
+echo "INFO ==>: 🚀 Cloud DR Orchestrator - Automated Backup Setup"
+echo "INFO ==>: =================================================="
 echo ""
 
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then
-    echo "❌ Please run as root (use sudo)"
+    echo "INFO ==>: ❌ Please run as root (use sudo)"
     exit 1
 fi
 
 # Check if orchestrator binary exists
 if ! command -v orchestrator &> /dev/null; then
-    echo "❌ orchestrator binary not found in PATH"
-    echo "   Please install it first: go install github.com/Kobeep/cloud-dr-orchestrator/cmd/orchestrator@latest"
+    echo "INFO ==>: ❌ orchestrator binary not found in PATH"
+    echo "INFO ==>:    Please install it first: go install github.com/Kobeep/cloud-dr-orchestrator/cmd/orchestrator@latest"
     exit 1
 fi
 
-echo "✅ Found orchestrator at: $(which orchestrator)"
+echo "INFO ==>: ✅ Found orchestrator at: $(which orchestrator)"
 echo ""
 
 # Create working directory
-echo "📁 Creating working directory: $WORK_DIR"
+echo "INFO ==>: 📁 Creating working directory: $WORK_DIR"
 mkdir -p "$WORK_DIR"
 chmod 755 "$WORK_DIR"
 
 # Create config directory
-echo "📁 Creating config directory: $CONFIG_DIR"
+echo "INFO ==>: 📁 Creating config directory: $CONFIG_DIR"
 mkdir -p "$CONFIG_DIR"
 chmod 700 "$CONFIG_DIR"
 
 # Copy example config
-echo "📝 Installing configuration template"
+echo "INFO ==>: 📝 Installing configuration template"
 cp configs/backup.env.example "$CONFIG_DIR/backup.env"
 chmod 600 "$CONFIG_DIR/backup.env"
 
 echo ""
-echo "⚠️  IMPORTANT: Edit $CONFIG_DIR/backup.env with your settings!"
+echo "INFO ==>: ⚠️  IMPORTANT: Edit $CONFIG_DIR/backup.env with your settings!"
 echo ""
 
 # Detect init system
 if command -v systemctl &> /dev/null && [ -d "/etc/systemd/system" ]; then
-    echo "🔧 Detected systemd - installing service and timer"
+    echo "INFO ==>: 🔧 Detected systemd - installing service and timer"
 
     # Install systemd files
     cp systemd/orchestrator-backup.service "$SYSTEMD_DIR/"
@@ -62,16 +62,16 @@ if command -v systemctl &> /dev/null && [ -d "/etc/systemd/system" ]; then
     # Enable timer (don't start yet - user needs to configure first)
     systemctl enable orchestrator-backup.timer
 
-    echo "✅ Systemd service installed!"
+    echo "INFO ==>: ✅ Systemd service installed!"
     echo ""
-    echo "Next steps:"
-    echo "  1. Edit config: nano $CONFIG_DIR/backup.env"
-    echo "  2. Start timer: systemctl start orchestrator-backup.timer"
-    echo "  3. Check status: systemctl status orchestrator-backup.timer"
-    echo "  4. View logs: journalctl -u orchestrator-backup.service"
+    echo "INFO ==>: Next steps:"
+    echo "INFO ==>:   1. Edit config: nano $CONFIG_DIR/backup.env"
+    echo "INFO ==>:   2. Start timer: systemctl start orchestrator-backup.timer"
+    echo "INFO ==>:   3. Check status: systemctl status orchestrator-backup.timer"
+    echo "INFO ==>:   4. View logs: journalctl -u orchestrator-backup.service"
 
 else
-    echo "🔧 systemd not found - installing cron job"
+    echo "INFO ==>: 🔧 systemd not found - installing cron job"
 
     # Create cron script wrapper
     cat > "$INSTALL_DIR/orchestrator-backup-cron.sh" << 'EOF'
@@ -99,15 +99,15 @@ EOF
 
     chmod +x "$INSTALL_DIR/orchestrator-backup-cron.sh"
 
-    echo "✅ Cron wrapper script installed!"
+    echo "INFO ==>: ✅ Cron wrapper script installed!"
     echo ""
-    echo "Next steps:"
-    echo "  1. Edit config: nano $CONFIG_DIR/backup.env"
-    echo "  2. Add to crontab: crontab -e"
+    echo "INFO ==>: Next steps:"
+    echo "INFO ==>:   1. Edit config: nano $CONFIG_DIR/backup.env"
+    echo "INFO ==>:   2. Add to crontab: crontab -e"
     echo ""
-    echo "Example crontab entry (daily at 2 AM):"
-    echo "  0 2 * * * $INSTALL_DIR/orchestrator-backup-cron.sh"
+    echo "INFO ==>: Example crontab entry (daily at 2 AM):"
+    echo "INFO ==>:   0 2 * * * $INSTALL_DIR/orchestrator-backup-cron.sh"
 fi
 
 echo ""
-echo "✨ Setup complete! Oracle Cloud Free Tier compatible."
+echo "INFO ==>: ✨ Setup complete! Oracle Cloud Free Tier compatible."
