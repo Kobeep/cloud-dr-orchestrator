@@ -153,6 +153,54 @@ tar xzf restore.tar.gz
 psql myapp < backup-20251209-104235.sql
 ```
 
+## Automated Scheduling
+
+Set up automated backups with systemd (Linux) or cron:
+
+### systemd (Recommended for Linux)
+
+```bash
+# Run the setup script
+sudo ./scripts/setup-automation.sh
+
+# Edit configuration
+sudo nano /etc/cloud-dr-orchestrator/backup.env
+
+# Start the timer
+sudo systemctl start orchestrator-backup.timer
+sudo systemctl enable orchestrator-backup.timer
+
+# Check status
+systemctl status orchestrator-backup.timer
+journalctl -u orchestrator-backup.service
+```
+
+The timer runs daily at 2 AM by default. Edit `/etc/systemd/system/orchestrator-backup.timer` to customize.
+
+### cron (Linux/macOS)
+
+```bash
+# Run setup script (creates wrapper)
+sudo ./scripts/setup-automation.sh
+
+# Edit configuration
+sudo nano /etc/cloud-dr-orchestrator/backup.env
+
+# Add to crontab
+crontab -e
+
+# Daily at 2 AM
+0 2 * * * /usr/local/bin/orchestrator-backup-cron.sh
+
+# Every 6 hours
+0 */6 * * * /usr/local/bin/orchestrator-backup-cron.sh
+
+# Weekly on Sunday at 3 AM
+0 3 * * 0 /usr/local/bin/orchestrator-backup-cron.sh
+```
+
+**Free Tier Note:** With 20GB storage and automated daily backups, keep ~30 days of backups before rotation needed.
+
 ## Development Status
 
 � **Active Development** - Core features implemented and tested!
@@ -179,19 +227,12 @@ psql myapp < backup-20251209-104235.sql
   - Download from cloud and restore
   - Confirmation prompt before restore
   - Support for target database override
-  - Backup retention policies
 
-- ⏳ **Issue #7**: Monitoring and metrics
-  - Backup success/failure tracking
-  - Storage usage monitoring
-
-- ⏳ **Issue #8**: Encryption at rest
-  - Client-side encryption before upload
-
-- ⏳ **Issue #9**: Testing and CI/CD
-  - Unit tests
-  - Integration tests
-  - GitHub Actions pipeline
+- ✅ **Issue #8**: Scheduling and automation
+  - systemd service and timer
+  - Cron wrapper script
+  - Automated installation script
+  - Works on Linux and macOS
 
 ## Contributing
 
