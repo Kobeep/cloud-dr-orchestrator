@@ -1,0 +1,35 @@
+[Unit]
+Description=Cloud DR Orchestrator - PostgreSQL Backup to Oracle Cloud
+Documentation=https://github.com/Kobeep/cloud-dr-orchestrator
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/cloud-dr-orchestrator
+EnvironmentFile=/etc/cloud-dr-orchestrator/backup.env
+ExecStart=/usr/local/bin/orchestrator backup \
+  --name ${BACKUP_NAME} \
+  --db-name ${DB_NAME} \
+  --db-host ${DB_HOST} \
+  --db-port ${DB_PORT} \
+  --db-user ${DB_USER} \
+  --db-password ${DB_PASSWORD}
+ExecStartPost=/usr/local/bin/orchestrator upload \
+  --file /opt/cloud-dr-orchestrator/${BACKUP_NAME}-*.tar.gz \
+  --bucket ${OCI_BUCKET} \
+  --compartment ${OCI_COMPARTMENT}
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=orchestrator-backup
+
+# Security hardening (optional but recommended)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/cloud-dr-orchestrator /var/log
+
+[Install]
+WantedBy=multi-user.target
