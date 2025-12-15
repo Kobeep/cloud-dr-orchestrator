@@ -1,0 +1,333 @@
+{
+  "dashboard": {
+    "title": "Cloud DR Orchestrator - Backup Monitoring",
+    "description": "Monitor PostgreSQL backup operations, Oracle Cloud uploads, and restore activities",
+    "tags": ["backup", "postgresql", "oracle-cloud", "disaster-recovery"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "30s",
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Overall Health Status",
+        "type": "stat",
+        "gridPos": {"x": 0, "y": 0, "w": 8, "h": 4},
+        "targets": [
+          {
+            "expr": "up{job=\"cloud-dr-orchestrator\"}",
+            "refId": "A",
+            "legendFormat": "Service Status"
+          }
+        ],
+        "options": {
+          "graphMode": "none",
+          "colorMode": "background",
+          "textMode": "value_and_name"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {"type": "value", "value": "0", "text": "DOWN", "color": "red"},
+              {"type": "value", "value": "1", "text": "UP", "color": "green"}
+            ],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 1, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Total Backups (24h)",
+        "type": "stat",
+        "gridPos": {"x": 8, "y": 0, "w": 4, "h": 4},
+        "targets": [
+          {
+            "expr": "increase(orchestrator_backup_success_total[24h])",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Failed Backups (24h)",
+        "type": "stat",
+        "gridPos": {"x": 12, "y": 0, "w": 4, "h": 4},
+        "targets": [
+          {
+            "expr": "increase(orchestrator_backup_failure_total[24h])",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "yellow"},
+                {"value": 3, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Success Rate (24h)",
+        "type": "gauge",
+        "gridPos": {"x": 16, "y": 0, "w": 8, "h": 4},
+        "targets": [
+          {
+            "expr": "rate(orchestrator_backup_success_total[24h]) / (rate(orchestrator_backup_success_total[24h]) + rate(orchestrator_backup_failure_total[24h])) * 100",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 90, "color": "yellow"},
+                {"value": 95, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Backup Operations Over Time",
+        "type": "timeseries",
+        "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(orchestrator_backup_success_total[5m])",
+            "refId": "A",
+            "legendFormat": "Successful Backups/s"
+          },
+          {
+            "expr": "rate(orchestrator_backup_failure_total[5m])",
+            "refId": "B",
+            "legendFormat": "Failed Backups/s ({{reason}})"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "table", "placement": "bottom"}
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {"lineWidth": 2, "fillOpacity": 10}
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Backup Duration (95th percentile)",
+        "type": "timeseries",
+        "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(orchestrator_backup_duration_seconds_bucket[5m]))",
+            "refId": "A",
+            "legendFormat": "95th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(orchestrator_backup_duration_seconds_bucket[5m]))",
+            "refId": "B",
+            "legendFormat": "Median"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "table", "placement": "bottom"}
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "custom": {"lineWidth": 2, "fillOpacity": 10}
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Backup Size Distribution",
+        "type": "timeseries",
+        "gridPos": {"x": 0, "y": 12, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(orchestrator_backup_size_bytes_bucket[5m]))",
+            "refId": "A",
+            "legendFormat": "95th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(orchestrator_backup_size_bytes_bucket[5m]))",
+            "refId": "B",
+            "legendFormat": "Median"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "table", "placement": "bottom"}
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "bytes",
+            "custom": {"lineWidth": 2, "fillOpacity": 10}
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Upload/Download Performance",
+        "type": "timeseries",
+        "gridPos": {"x": 12, "y": 12, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(orchestrator_upload_duration_seconds_bucket[5m]))",
+            "refId": "A",
+            "legendFormat": "Upload (p95)"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(orchestrator_download_duration_seconds_bucket[5m]))",
+            "refId": "B",
+            "legendFormat": "Download (p95)"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "table", "placement": "bottom"}
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "custom": {"lineWidth": 2, "fillOpacity": 10}
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "Oracle Cloud Operations",
+        "type": "stat",
+        "gridPos": {"x": 0, "y": 20, "w": 8, "h": 4},
+        "targets": [
+          {
+            "expr": "increase(orchestrator_upload_success_total[24h])",
+            "refId": "A",
+            "legendFormat": "Uploads"
+          },
+          {
+            "expr": "increase(orchestrator_download_success_total[24h])",
+            "refId": "B",
+            "legendFormat": "Downloads"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Restore Operations (7d)",
+        "type": "stat",
+        "gridPos": {"x": 8, "y": 20, "w": 8, "h": 4},
+        "targets": [
+          {
+            "expr": "increase(orchestrator_restore_success_total[7d])",
+            "refId": "A",
+            "legendFormat": "Successful"
+          },
+          {
+            "expr": "increase(orchestrator_restore_failure_total[7d])",
+            "refId": "B",
+            "legendFormat": "Failed"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 11,
+        "title": "Recent Failures",
+        "type": "table",
+        "gridPos": {"x": 16, "y": 20, "w": 8, "h": 8},
+        "targets": [
+          {
+            "expr": "orchestrator_backup_failure_total",
+            "refId": "A",
+            "format": "table",
+            "instant": true
+          },
+          {
+            "expr": "orchestrator_upload_failure_total",
+            "refId": "B",
+            "format": "table",
+            "instant": true
+          },
+          {
+            "expr": "orchestrator_restore_failure_total",
+            "refId": "C",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "options": {
+          "showHeader": true
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {"align": "auto"}
+          }
+        }
+      }
+    ]
+  }
+}
