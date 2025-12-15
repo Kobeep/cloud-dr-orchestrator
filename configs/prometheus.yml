@@ -1,0 +1,66 @@
+# Prometheus Configuration Example for Cloud DR Orchestrator
+# Copy this file to your Prometheus configuration directory
+
+global:
+  scrape_interval: 15s # Scrape targets every 15 seconds
+  evaluation_interval: 15s # Evaluate rules every 15 seconds
+
+  # Labels to add to any time series or alerts
+  external_labels:
+    monitor: 'cloud-dr-orchestrator'
+    environment: 'production'
+
+# Alertmanager configuration (optional)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - 'localhost:9093' # Uncomment if using Alertmanager
+
+# Load alert rules
+rule_files:
+  - 'alerts.yml' # Alert rules for backup failures
+
+# Scrape configurations
+scrape_configs:
+  # Cloud DR Orchestrator metrics
+  - job_name: 'orchestrator'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          application: 'cloud-dr-orchestrator'
+          component: 'backup-service'
+
+    # Scrape frequency
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+    # Metrics path (default is /metrics)
+    metrics_path: '/metrics'
+
+    # Optional: Basic auth if you add authentication
+    # basic_auth:
+    #   username: 'admin'
+    #   password: 'secret'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Optional: Node Exporter for system metrics
+  # - job_name: 'node'
+  #   static_configs:
+  #     - targets: ['localhost:9100']
+
+# Storage configuration
+storage:
+  tsdb:
+    # Keep data for 30 days (adjust based on your needs)
+    retention.time: 30d
+    # Maximum storage size (optional)
+    # retention.size: 10GB
+
+# Remote write (optional - for long-term storage)
+# remote_write:
+#   - url: 'http://remote-storage:9009/api/v1/write'
