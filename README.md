@@ -201,6 +201,106 @@ crontab -e
 
 **Free Tier Note:** With 20GB storage and automated daily backups, keep ~30 days of backups before rotation needed.
 
+## Monitoring and Observability
+
+Monitor your backups with **Grafana Alloy** and **Grafana Cloud** (free tier)! 📊
+
+### Quick Start
+
+```bash
+# Start metrics server
+orchestrator metrics --port 9090
+
+# Available endpoints:
+# - http://localhost:9090/metrics  (Prometheus metrics)
+# - http://localhost:9090/health   (Health check JSON)
+```
+
+### Metrics Available
+
+The orchestrator exposes comprehensive metrics:
+
+**Backup Metrics:**
+- `orchestrator_backup_duration_seconds` - Backup operation time (histogram)
+- `orchestrator_backup_size_bytes` - Backup file size (histogram)
+- `orchestrator_backup_success_total` - Successful backup counter
+- `orchestrator_backup_failure_total` - Failed backup counter (with reason labels)
+
+**Cloud Operations:**
+- `orchestrator_upload_duration_seconds` - Upload time to Oracle Cloud
+- `orchestrator_upload_success_total` / `_failure_total` - Upload counters
+- `orchestrator_download_duration_seconds` - Download time from Oracle Cloud
+- `orchestrator_download_success_total` / `_failure_total` - Download counters
+
+**Restore Operations:**
+- `orchestrator_restore_duration_seconds` - Restore operation time
+- `orchestrator_restore_success_total` / `_failure_total` - Restore counters
+
+### Grafana Cloud Setup (FREE)
+
+1. **Sign up:** https://grafana.com/auth/sign-up/create-user
+   - Free tier: 10k metrics, 50GB logs, 14 days retention
+   - Our app uses ~50 metrics series (well within limit!)
+
+2. **Install Grafana Alloy:**
+   ```bash
+   # Linux (Debian/Ubuntu)
+   wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor | sudo tee /usr/share/keyrings/grafana.gpg
+   echo "deb [signed-by=/usr/share/keyrings/grafana.gpg] https://apt.grafana.com stable main" | sudo tee /etc/apt/sources.list.d/grafana.list
+   sudo apt update && sudo apt install alloy
+
+   # macOS
+   brew install grafana/grafana/alloy
+   ```
+
+3. **Configure:**
+   ```bash
+   # Copy config templates
+   cp configs/grafana-cloud.env.example configs/grafana-cloud.env
+   cp configs/alloy-config.alloy /etc/alloy/config.alloy
+
+   # Edit with your Grafana Cloud credentials
+   nano configs/grafana-cloud.env
+   ```
+
+4. **Start Alloy:**
+   ```bash
+   export $(cat configs/grafana-cloud.env | xargs)
+   sudo alloy run configs/alloy-config.alloy
+   ```
+
+5. **Import Dashboard:**
+   - Go to Grafana Cloud → Dashboards → Import
+   - Upload `configs/grafana-dashboard.json`
+   - Done! 🎉
+
+### Dashboard Panels
+
+Your dashboard includes:
+- ✅ Overall health status indicator
+- 📊 Backup success rate (24h)
+- ⏱️ Backup duration trends (p95, median)
+- 📦 Backup size distribution over time
+- ☁️ Upload/download performance
+- 🔴 Recent failures table with error reasons
+
+### Alerting
+
+Automatic alerts for:
+- **BackupFailed** - Immediate alert on backup failure
+- **BackupNotRunRecently** - No backup in 25 hours
+- **BackupTakingTooLong** - Duration > 30 minutes
+- **UploadFailed** - Cloud upload errors
+- **OrchestratorDown** - Service unavailable
+
+Configure notifications via:
+- Email
+- Slack
+- PagerDuty
+- Webhook
+
+📖 **Full setup guide:** [docs/MONITORING.md](docs/MONITORING.md)
+
 ## Development Status
 
 � **Active Development** - Core features implemented and tested!
@@ -233,6 +333,14 @@ crontab -e
   - Cron wrapper script
   - Automated installation script
   - Works on Linux and macOS
+
+- ✅ **Issue #9**: Monitoring and observability
+  - Prometheus metrics endpoint
+  - Grafana Alloy configuration
+  - Grafana Cloud integration (free tier)
+  - Pre-built dashboard with 11 panels
+  - Comprehensive alerting rules
+  - Health check endpoint
 
 ## Contributing
 
