@@ -2,9 +2,12 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/Kobeep/cloud-dr-orchestrator/pkg/backup"
+	"github.com/Kobeep/cloud-dr-orchestrator/pkg/metrics"
 	"github.com/spf13/cobra"
 )
 
@@ -28,6 +31,9 @@ var backupCmd = &cobra.Command{
 			return fmt.Errorf("only 'postgres' source is currently supported")
 		}
 
+		// Start timing for metrics
+		startTime := time.Now()
+
 		// Prepare PostgreSQL config
 		config := backup.PostgresConfig{
 			Host:     dbHost,
@@ -50,10 +56,26 @@ var backupCmd = &cobra.Command{
 		// Create backup
 		result, err := backup.DumpPostgres(config, backupName, absOutputDir)
 		if err != nil {
+			// Record failure metrics
+			metrics.BackupFailure.WithLabelValues("dump_failed").Inc()
+			metrics.RecordBackupError(err)
 			return fmt.Errorf("backup failed: %w", err)
 		}
 
+		// Record success metrics
+		duration := time.Since(startTime).Seconds()
+		metrics.BackupDuration.Observe(duration)
+		metrics.BackupSuccess.Inc()
+		metrics.RecordBackupSuccess()
+
+		// Get file size for metrics
+		fileInfo, err := os.Stat(result.FilePath)
+		if err == nil {
+			metrics.BackupSize.Observe(float64(fileInfo.Size()))
+		}
+
 		fmt.Printf("\n📦 Backup file: %s\n", result.FilePath)
+		fmt.Printf("⏱️  Duration: %.2fs\n", duration)
 
 		return nil
 	},
