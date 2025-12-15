@@ -2,12 +2,15 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/Kobeep/cloud-dr-orchestrator/pkg/backup"
+	"github.com/Kobeep/cloud-dr-orchestrator/pkg/metrics"
 	"github.com/Kobeep/cloud-dr-orchestrator/pkg/oracle"
 	"github.com/spf13/cobra"
 )
@@ -111,7 +114,14 @@ func runRestore(cmd *cobra.Command, args []string) error {
 		fmt.Printf("   Object: %s\n", restoreFromCloud)
 
 		// Initialize Oracle Cloud client
-		client, err := oracle.NewClient(restoreOCIConfig, restoreOCIProfile, restoreCompartment)
+		config := oracle.Config{
+			ConfigFilePath: restoreOCIConfig,
+			Profile:        restoreOCIProfile,
+			BucketName:     restoreBucket,
+			CompartmentID:  restoreCompartment,
+		}
+
+		client, err := oracle.NewClient(config)
 		if err != nil {
 			return fmt.Errorf("failed to initialize Oracle Cloud client: %w", err)
 		}
@@ -125,7 +135,9 @@ func runRestore(cmd *cobra.Command, args []string) error {
 
 		// Download file
 		backupFilePath = filepath.Join(tempDir, filepath.Base(restoreFromCloud))
-		if err := client.DownloadObject(restoreBucket, restoreFromCloud, backupFilePath); err != nil {
+		ctx := context.Background()
+		_, err = client.DownloadFile(ctx, restoreFromCloud, backupFilePath)
+		if err != nil {
 			return fmt.Errorf("failed to download backup: %w", err)
 		}
 		cleanupFile = true
@@ -167,10 +179,20 @@ func runRestore(cmd *cobra.Command, args []string) error {
 		fmt.Println()
 	}
 
+	// Start timing for metrics
+	startTime := time.Now()
+
 	// Perform restore
 	if err := backup.RestorePostgres(pgConfig, backupFilePath, restoreTargetDB); err != nil {
+		// Record failure metrics
+		metrics.RestoreFailure.WithLabelValues("restore_failed").Inc()
 		return fmt.Errorf("restore failed: %w", err)
 	}
+
+	// Record success metrics
+	duration := time.Since(startTime).Seconds()
+	metrics.RestoreDuration.Observe(duration)
+	metrics.RestoreSuccess.Inc()
 
 	// Cleanup downloaded file if needed
 	if cleanupFile {
