@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/Kobeep/cloud-dr-orchestrator/pkg/metrics"
 	"github.com/Kobeep/cloud-dr-orchestrator/pkg/oracle"
 	"github.com/spf13/cobra"
 )
@@ -72,6 +73,9 @@ func runUpload(cmd *cobra.Command, args []string) error {
 	fmt.Printf("✓ Connected to namespace: %s\n", client.GetNamespace())
 	fmt.Printf("📤 Uploading file: %s\n", uploadFile)
 
+	// Start timing for metrics
+	startTime := time.Now()
+
 	// Upload the file
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
@@ -84,8 +88,15 @@ func runUpload(cmd *cobra.Command, args []string) error {
 	}
 
 	if err != nil {
+		// Record failure metrics
+		metrics.UploadFailure.WithLabelValues("upload_failed").Inc()
 		return fmt.Errorf("upload failed: %w", err)
 	}
+
+	// Record success metrics
+	duration := time.Since(startTime).Seconds()
+	metrics.UploadDuration.Observe(duration)
+	metrics.UploadSuccess.Inc()
 
 	// Print success message
 	fmt.Printf("\n✓ Upload successful!\n")

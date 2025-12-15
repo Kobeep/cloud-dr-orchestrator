@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Kobeep/cloud-dr-orchestrator/pkg/metrics"
 	"github.com/Kobeep/cloud-dr-orchestrator/pkg/oracle"
 	"github.com/spf13/cobra"
 )
@@ -61,14 +62,24 @@ func runDownload(cmd *cobra.Command, args []string) error {
 	fmt.Printf("✓ Connected to namespace: %s\n", client.GetNamespace())
 	fmt.Printf("📥 Downloading object: %s\n", downloadObjectName)
 
+	// Start timing for metrics
+	startTime := time.Now()
+
 	// Download the file
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	result, err := client.DownloadFile(ctx, downloadObjectName, downloadOutput)
 	if err != nil {
+		// Record failure metrics
+		metrics.DownloadFailure.WithLabelValues("download_failed").Inc()
 		return fmt.Errorf("download failed: %w", err)
 	}
+
+	// Record success metrics
+	duration := time.Since(startTime).Seconds()
+	metrics.DownloadDuration.Observe(duration)
+	metrics.DownloadSuccess.Inc()
 
 	// Print success message
 	fmt.Printf("\n✓ Download successful!\n")

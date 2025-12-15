@@ -1,0 +1,88 @@
+# Grafana Alloy Configuration for Cloud DR Orchestrator
+# Alloy is the new telemetry collector that replaces Prometheus Agent
+
+# Logging configuration
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+# Prometheus scraping component
+prometheus.scrape "orchestrator" {
+  targets = [{
+    __address__ = "localhost:9090",
+    job         = "cloud-dr-orchestrator",
+    instance    = "main",
+  }]
+
+  forward_to = [prometheus.relabel.orchestrator.receiver]
+
+  scrape_interval = "30s"
+  scrape_timeout  = "10s"
+}
+
+# Add useful labels to metrics
+prometheus.relabel "orchestrator" {
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+
+  rule {
+    source_labels = ["__address__"]
+    target_label  = "instance"
+  }
+
+  rule {
+    replacement   = "cloud-dr-orchestrator"
+    target_label  = "application"
+  }
+
+  rule {
+    replacement   = "backup-service"
+    target_label  = "component"
+  }
+}
+
+# Remote write to Grafana Cloud (or local Prometheus)
+prometheus.remote_write "grafana_cloud" {
+  endpoint {
+    url = env("GRAFANA_CLOUD_PROMETHEUS_URL")
+
+    basic_auth {
+      username = env("GRAFANA_CLOUD_PROMETHEUS_USER")
+      password = env("GRAFANA_CLOUD_API_KEY")
+    }
+
+    # Optional: Add external labels
+    headers = {
+      "X-Scope-OrgID" = "cloud-dr-orchestrator",
+    }
+  }
+
+  # Queue configuration for reliability
+  queue_config {
+    capacity          = 10000
+    max_shards        = 10
+    min_shards        = 1
+    max_samples_per_send = 5000
+    batch_send_deadline  = "5s"
+    min_backoff          = "30ms"
+    max_backoff          = "5s"
+  }
+}
+
+# Alternative: Local Prometheus endpoint (uncomment if not using Grafana Cloud)
+# prometheus.remote_write "local_prometheus" {
+#   endpoint {
+#     url = "http://localhost:9090/api/v1/write"
+#   }
+# }
+
+# Health check for monitoring the orchestrator service
+prometheus.exporter.unix "system" {
+  include_exporter_metrics = true
+  disable_collectors       = ["mdadm"]
+}
+
+prometheus.scrape "system" {
+  targets    = prometheus.exporter.unix.system.targets
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+}

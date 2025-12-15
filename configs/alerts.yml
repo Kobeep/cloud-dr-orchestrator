@@ -1,0 +1,115 @@
+# Prometheus Alerting Rules for Cloud DR Orchestrator
+# These rules work with both Grafana Alerting and Prometheus Alertmanager
+
+groups:
+  - name: backup_alerts
+    interval: 1m
+    rules:
+      # Alert when backup fails
+      - alert: BackupFailed
+        expr: increase(orchestrator_backup_failure_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: backup
+        annotations:
+          summary: "Backup operation failed"
+          description: "Backup failed with reason: {{ $labels.reason }}. Check logs immediately."
+          runbook_url: "https://github.com/Kobeep/cloud-dr-orchestrator/wiki/Troubleshooting#backup-failed"
+
+      # Alert when no backup in 25 hours (daily backup expected)
+      - alert: BackupNotRunRecently
+        expr: time() - orchestrator_backup_success_total > 90000 # 25 hours
+        for: 1h
+        labels:
+          severity: warning
+          component: backup
+        annotations:
+          summary: "No successful backup in last 25 hours"
+          description: "Expected daily backup not completed. Last success: {{ $value | humanizeDuration }} ago."
+          runbook_url: "https://github.com/Kobeep/cloud-dr-orchestrator/wiki/Troubleshooting#backup-not-running"
+
+      # Alert when backup takes too long (> 30 minutes)
+      - alert: BackupTakingTooLong
+        expr: histogram_quantile(0.95, rate(orchestrator_backup_duration_seconds_bucket[5m])) > 1800
+        for: 5m
+        labels:
+          severity: warning
+          component: backup
+        annotations:
+          summary: "Backup duration is unusually high"
+          description: "95th percentile backup duration is {{ $value | humanizeDuration }}. Investigate database size or performance."
+
+      # Alert when upload fails
+      - alert: UploadFailed
+        expr: increase(orchestrator_upload_failure_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: upload
+        annotations:
+          summary: "Upload to Oracle Cloud failed"
+          description: "Failed to upload backup with reason: {{ $labels.reason }}. Backups are not safe!"
+          runbook_url: "https://github.com/Kobeep/cloud-dr-orchestrator/wiki/Troubleshooting#upload-failed"
+
+      # Alert when restore fails
+      - alert: RestoreFailed
+        expr: increase(orchestrator_restore_failure_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: restore
+        annotations:
+          summary: "Database restore operation failed"
+          description: "Restore failed with reason: {{ $labels.reason }}. Data recovery at risk!"
+          runbook_url: "https://github.com/Kobeep/cloud-dr-orchestrator/wiki/Troubleshooting#restore-failed"
+
+  - name: health_alerts
+    interval: 30s
+    rules:
+      # Alert when service is down
+      - alert: OrchestratorDown
+        expr: up{job="cloud-dr-orchestrator"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: service
+        annotations:
+          summary: "Cloud DR Orchestrator service is down"
+          description: "Metrics endpoint is not responding. Service may be crashed or stopped."
+          runbook_url: "https://github.com/Kobeep/cloud-dr-orchestrator/wiki/Troubleshooting#service-down"
+
+  - name: performance_alerts
+    interval: 5m
+    rules:
+      # Alert when backup size grows significantly
+      - alert: BackupSizeIncreasing
+        expr: |
+          (
+            histogram_quantile(0.95, rate(orchestrator_backup_size_bytes_bucket[24h]))
+            /
+            histogram_quantile(0.95, rate(orchestrator_backup_size_bytes_bucket[24h] offset 7d))
+          ) > 1.5
+        for: 1h
+        labels:
+          severity: info
+          component: backup
+        annotations:
+          summary: "Backup size increased by >50%"
+          description: "Backup size grew significantly. Current 95th percentile: {{ $value | humanize }}. Consider cleanup or investigate data growth."
+
+      # Alert when backup success rate drops
+      - alert: LowBackupSuccessRate
+        expr: |
+          (
+            rate(orchestrator_backup_success_total[1h])
+            /
+            (rate(orchestrator_backup_success_total[1h]) + rate(orchestrator_backup_failure_total[1h]))
+          ) < 0.95
+        for: 30m
+        labels:
+          severity: warning
+          component: backup
+        annotations:
+          summary: "Backup success rate below 95%"
+          description: "Recent backup operations are failing frequently. Success rate: {{ $value | humanizePercentage }}."
