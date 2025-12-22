@@ -1,5 +1,5 @@
 jobs:
-    # PostgreSQL Database Backups
+# PostgreSQL Database Backups
     - name: daily-db-backup
       schedule: 0 0 * * *
       command: /usr/local/bin/orchestrator backup --type postgres --name prod-db --db-name myapp --db-host localhost --db-user postgres --db-password secret --encrypt && /usr/local/bin/orchestrator upload --file /tmp/backup-*.tar.gz.encrypted --bucket my-bucket --compartment ocid1.compartment.oc1..xxx
@@ -41,3 +41,4 @@ jobs:
       env:
         BACKUP_ENCRYPTION_KEY: your-encryption-key-here
         PATH: /usr/local/bin:/usr/bin:/bin
+
