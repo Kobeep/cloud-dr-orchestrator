@@ -169,6 +169,77 @@ orchestrator restore \
   --db-password secret
 ```
 
+## Automated Backup Schedules
+
+Schedule automated backups using **Cronify** integration! 🕒
+
+### Install Cronify
+
+Install Cronify (YAML-driven cron job manager):
+
+```bash
+git clone https://github.com/Kobeep/Cronify.git
+cd Cronify
+sudo ./install.sh
+```
+
+### Generate Schedule Template
+
+```bash
+# Create example backup-schedule.yaml
+orchestrator schedule init
+
+# Or specify custom output file
+orchestrator schedule init --output my-schedule.yaml
+```
+
+### Example Schedule YAML
+
+```yaml
+jobs:
+  - name: daily-backup
+    schedule: "0 0 * * *"  # Every day at midnight
+    command: /usr/local/bin/orchestrator backup --name prod-db --db-name myapp --encrypt
+    env:
+      BACKUP_ENCRYPTION_KEY: "your-key-here"
+      PATH: "/usr/local/bin:/usr/bin:/bin"
+
+  - name: weekly-backup
+    schedule: "0 3 * * 0"  # Every Sunday at 3 AM
+    command: /usr/local/bin/orchestrator backup --name prod-db-weekly --encrypt
+
+  - name: monthly-backup
+    schedule: "0 2 1 * *"  # 1st of month at 2 AM
+    command: /usr/local/bin/orchestrator backup --name prod-db-monthly --encrypt
+```
+
+### Validate Schedule
+
+```bash
+# Check cron expressions and commands
+orchestrator schedule validate --file backup-schedule.yaml
+
+# Simulate next 5 run times
+orchestrator schedule validate --file backup-schedule.yaml --simulate
+```
+
+### Deploy to Crontab
+
+```bash
+# Preview without deploying
+orchestrator schedule deploy --file backup-schedule.yaml --dry-run
+
+# Deploy to crontab
+orchestrator schedule deploy --file backup-schedule.yaml
+```
+
+### View Active Schedules
+
+```bash
+# View current crontab
+crontab -l
+```
+
 ## Configuration
 
 ### Oracle Cloud Credentials
