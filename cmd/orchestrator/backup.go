@@ -7,19 +7,22 @@ import (
 	"time"
 
 	"github.com/Kobeep/cloud-dr-orchestrator/pkg/backup"
+	"github.com/Kobeep/cloud-dr-orchestrator/pkg/encryption"
 	"github.com/Kobeep/cloud-dr-orchestrator/pkg/metrics"
 	"github.com/spf13/cobra"
 )
 
 var (
-	backupSource string
-	backupName   string
-	dbHost       string
-	dbPort       int
-	dbUser       string
-	dbPassword   string
-	dbName       string
-	outputDir    string
+	backupSource  string
+	backupName    string
+	dbHost        string
+	dbPort        int
+	dbUser        string
+	dbPassword    string
+	dbName        string
+	outputDir     string
+	encryptBackup bool
+	encryptionKey string
 )
 
 var backupCmd = &cobra.Command{
@@ -53,6 +56,11 @@ var backupCmd = &cobra.Command{
 		fmt.Printf("Output directory: %s\n", absOutputDir)
 		fmt.Println()
 
+		// Check for encryption key from environment if not provided
+		if encryptBackup && encryptionKey == "" {
+			encryptionKey = os.Getenv("BACKUP_ENCRYPTION_KEY")
+		}
+
 		// Create backup
 		result, err := backup.DumpPostgres(config, backupName, absOutputDir)
 		if err != nil {
@@ -74,7 +82,32 @@ var backupCmd = &cobra.Command{
 			metrics.BackupSize.Observe(float64(fileInfo.Size()))
 		}
 
-		fmt.Printf("\n📦 Backup file: %s\n", result.FilePath)
+		finalPath := result.FilePath
+
+		// Encrypt backup if requested
+		if encryptBackup {
+			if encryptionKey == "" {
+				metrics.BackupFailure.WithLabelValues("missing_encryption_key").Inc()
+				return fmt.Errorf("encryption key required when --encrypt is enabled")
+			}
+
+			fmt.Printf("🔐 Encrypting backup...\n")
+			encryptedPath, err := encryption.EncryptFile(result.FilePath, encryptionKey)
+			if err != nil {
+				metrics.BackupFailure.WithLabelValues("encryption_failed").Inc()
+				return fmt.Errorf("encryption failed: %w", err)
+			}
+
+			// Remove unencrypted file
+			if err := os.Remove(result.FilePath); err != nil {
+				fmt.Printf("⚠️  Warning: failed to remove unencrypted file: %v\n", err)
+			}
+
+			finalPath = encryptedPath
+			fmt.Printf("✅ Backup encrypted\n")
+		}
+
+		fmt.Printf("\n📦 Backup file: %s\n", finalPath)
 		fmt.Printf("⏱️  Duration: %.2fs\n", duration)
 
 		return nil
@@ -96,4 +129,8 @@ func init() {
 	backupCmd.MarkFlagRequired("db-name")
 
 	backupCmd.Flags().StringVar(&outputDir, "output", "./backups", "Output directory for backups")
+
+	// Encryption flags
+	backupCmd.Flags().BoolVar(&encryptBackup, "encrypt", false, "Encrypt backup file")
+	backupCmd.Flags().StringVar(&encryptionKey, "encryption-key", "", "Encryption key (or use BACKUP_ENCRYPTION_KEY env var)")
 }

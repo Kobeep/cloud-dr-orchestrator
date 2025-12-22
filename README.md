@@ -80,7 +80,84 @@ orchestrator restore \
   --db-password secret
 ```
 
+## Encryption
+
+Encrypt your backups before uploading to Oracle Cloud for maximum security! 🔐
+
+### Generate Encryption Key
+
+```bash
+# Generate a secure 256-bit key
+orchestrator keygen
+
+# Output:
+# 🔑 Generated 256-bit encryption key:
+# s0m3R4nd0mB4s364Enc0d3dK3y==
+```
+
+### Store Key Securely
+
+```bash
+# Save to environment variable
+export BACKUP_ENCRYPTION_KEY="your-key-here"
+
+# Or save to config file
+echo "BACKUP_ENCRYPTION_KEY=your-key-here" > ~/.backup-encryption.env
+export $(cat ~/.backup-encryption.env | xargs)
+```
+
+### Create Encrypted Backup
+
+```bash
+# Backup with encryption
+orchestrator backup \
+  --name prod-db \
+  --db-name myapp \
+  --db-host localhost \
+  --db-user postgres \
+  --db-password secret \
+  --encrypt
+
+# Output: backup-20251209-104235.tar.gz.encrypted
+```
+
+### Restore Encrypted Backup
+
+```bash
+# Automatic decryption (detects .encrypted extension)
+orchestrator restore \
+  --file backup-20251209-104235.tar.gz.encrypted \
+  --db-name myapp \
+  --db-host localhost \
+  --db-user postgres \
+  --db-password secret
+
+# Manual decryption (if needed)
+orchestrator restore \
+  --file backup.tar.gz \
+  --decrypt \
+  --decryption-key "$BACKUP_ENCRYPTION_KEY" \
+  --db-name myapp ...
+```
+
+### Encryption Details
+
+- **Algorithm:** AES-256-GCM (industry standard)
+- **Key Derivation:** PBKDF2 with 100,000 iterations
+- **Security:** Each file has unique salt and nonce
+- **Authentication:** GCM mode provides built-in integrity check
+- **File Format:** `.tar.gz.encrypted`
+
+⚠️ **IMPORTANT:**
+
+- **Never lose your encryption key!** Lost key = lost backups
+- **Store keys securely** (use secret managers in production)
+- **Never commit keys** to version control
+- **Backup your keys** in a secure location
+- **Rotate keys** periodically
+
 **6. Restore directly from cloud:**
+
 ```bash
 orchestrator restore \
   --from-cloud backups/2025/12/backup-20251209-092658.tar.gz \

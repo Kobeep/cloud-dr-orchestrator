@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Kobeep/cloud-dr-orchestrator/pkg/backup"
+	"github.com/Kobeep/cloud-dr-orchestrator/pkg/encryption"
 	"github.com/Kobeep/cloud-dr-orchestrator/pkg/metrics"
 	"github.com/Kobeep/cloud-dr-orchestrator/pkg/oracle"
 	"github.com/spf13/cobra"
@@ -35,19 +36,21 @@ Examples:
 }
 
 var (
-	restoreFile        string
-	restoreFromCloud   string
-	restoreTargetDB    string
-	restoreDBName      string
-	restoreDBHost      string
-	restoreDBPort      int
-	restoreDBUser      string
-	restoreDBPassword  string
-	restoreBucket      string
-	restoreCompartment string
-	restoreOCIConfig   string
-	restoreOCIProfile  string
-	restoreSkipConfirm bool
+	restoreFile          string
+	restoreFromCloud     string
+	restoreTargetDB      string
+	restoreDBName        string
+	restoreDBHost        string
+	restoreDBPort        int
+	restoreDBUser        string
+	restoreDBPassword    string
+	restoreBucket        string
+	restoreCompartment   string
+	restoreOCIConfig     string
+	restoreOCIProfile    string
+	restoreSkipConfirm   bool
+	restoreDecrypt       bool
+	restoreDecryptionKey string
 )
 
 func init() {
@@ -73,6 +76,10 @@ func init() {
 
 	// Safety flag
 	restoreCmd.Flags().BoolVar(&restoreSkipConfirm, "yes", false, "Skip confirmation prompt")
+
+	// Decryption flags
+	restoreCmd.Flags().BoolVar(&restoreDecrypt, "decrypt", false, "Decrypt backup file (auto-detected for .encrypted files)")
+	restoreCmd.Flags().StringVar(&restoreDecryptionKey, "decryption-key", "", "Decryption key (or use BACKUP_ENCRYPTION_KEY env var)")
 
 	// Required flags
 	restoreCmd.MarkFlagRequired("db-name")
@@ -148,6 +155,33 @@ func runRestore(cmd *cobra.Command, args []string) error {
 		if _, err := os.Stat(backupFilePath); os.IsNotExist(err) {
 			return fmt.Errorf("backup file not found: %s", backupFilePath)
 		}
+	}
+
+	// Auto-detect encryption or use --decrypt flag
+	isEncrypted := encryption.IsEncrypted(backupFilePath) || restoreDecrypt
+
+	// Decrypt if needed
+	if isEncrypted {
+		// Get decryption key from flag or environment
+		decryptKey := restoreDecryptionKey
+		if decryptKey == "" {
+			decryptKey = os.Getenv("BACKUP_ENCRYPTION_KEY")
+		}
+		if decryptKey == "" {
+			return fmt.Errorf("encrypted backup detected but no decryption key provided (use --decryption-key or BACKUP_ENCRYPTION_KEY env var)")
+		}
+
+		fmt.Printf("🔓 Decrypting backup...\n")
+		decryptedPath, err := encryption.DecryptFile(backupFilePath, decryptKey)
+		if err != nil {
+			metrics.RestoreFailure.WithLabelValues("decryption_failed").Inc()
+			return fmt.Errorf("decryption failed: %w", err)
+		}
+
+		// Update backup path to decrypted file
+		backupFilePath = decryptedPath
+		cleanupFile = true // Make sure to cleanup decrypted file
+		fmt.Printf("✅ Backup decrypted\n\n")
 	}
 
 	// Show restore plan
