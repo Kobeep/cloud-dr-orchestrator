@@ -1,0 +1,17 @@
+jobs:
+    - name: daily-backup
+      schedule: 0 0 * * *
+      command: /usr/local/bin/orchestrator backup --name prod-db --db-name myapp --db-host localhost --db-user postgres --db-password secret --encrypt && /usr/local/bin/orchestrator upload --file /tmp/backup-*.tar.gz.encrypted --bucket my-bucket --compartment ocid1.compartment.oc1..xxx
+      env:
+        BACKUP_ENCRYPTION_KEY: your-encryption-key-here
+        PATH: /usr/local/bin:/usr/bin:/bin
+    - name: weekly-backup
+      schedule: 0 3 * * 0
+      command: /usr/local/bin/orchestrator backup --name prod-db-weekly --db-name myapp --db-host localhost --db-user postgres --db-password secret --encrypt
+      env:
+        BACKUP_ENCRYPTION_KEY: your-encryption-key-here
+    - name: monthly-backup
+      schedule: 0 2 1 * *
+      command: /usr/local/bin/orchestrator backup --name prod-db-monthly --db-name myapp --db-host localhost --db-user postgres --db-password secret --encrypt
+      env:
+        BACKUP_ENCRYPTION_KEY: your-encryption-key-here
