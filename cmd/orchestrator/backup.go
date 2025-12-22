@@ -13,38 +13,40 @@ import (
 )
 
 var (
-	backupSource  string
-	backupName    string
-	dbHost        string
-	dbPort        int
-	dbUser        string
-	dbPassword    string
-	dbName        string
-	outputDir     string
-	encryptBackup bool
-	encryptionKey string
+	backupType      string
+	backupName      string
+	backupSources   []string // For file backups
+	excludePatterns []string // For file backups
+	dbHost          string
+	dbPort          int
+	dbUser          string
+	dbPassword      string
+	dbName          string
+	outputDir       string
+	encryptBackup   bool
+	encryptionKey   string
 )
 
 var backupCmd = &cobra.Command{
 	Use:   "backup",
-	Short: "Create a backup of PostgreSQL database",
-	Long:  `Dump PostgreSQL database, compress it to .tar.gz and optionally upload to Oracle Cloud.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		if backupSource != "postgres" {
-			return fmt.Errorf("only 'postgres' source is currently supported")
-		}
+	Short: "Create a backup (database, files, or directories)",
+	Long: `Create backups of various types:
+  - postgres: PostgreSQL database backup
+  - files: Backup specific files or directories
+  - mysql: MySQL database backup (coming soon)
 
+Examples:
+  # PostgreSQL backup
+  orchestrator backup --type postgres --name prod-db --db-name myapp
+
+  # File backup
+  orchestrator backup --type files --name configs --source /etc/nginx --source /etc/ssl
+
+  # Directory backup with exclusions
+  orchestrator backup --type files --name app-data --source /var/www --exclude "*.log" --exclude "tmp/*"`,
+	RunE: func(cmd *cobra.Command, args []string) error {
 		// Start timing for metrics
 		startTime := time.Now()
-
-		// Prepare PostgreSQL config
-		config := backup.PostgresConfig{
-			Host:     dbHost,
-			Port:     dbPort,
-			User:     dbUser,
-			Password: dbPassword,
-			Database: dbName,
-		}
 
 		// Resolve output directory
 		absOutputDir, err := filepath.Abs(outputDir)
@@ -52,20 +54,30 @@ var backupCmd = &cobra.Command{
 			return fmt.Errorf("invalid output directory: %w", err)
 		}
 
-		fmt.Printf("Starting backup: %s\n", backupName)
-		fmt.Printf("Output directory: %s\n", absOutputDir)
-		fmt.Println()
-
 		// Check for encryption key from environment if not provided
 		if encryptBackup && encryptionKey == "" {
 			encryptionKey = os.Getenv("BACKUP_ENCRYPTION_KEY")
 		}
 
-		// Create backup
-		result, err := backup.DumpPostgres(config, backupName, absOutputDir)
+		fmt.Printf("Starting %s backup: %s\n", backupType, backupName)
+		fmt.Printf("Output directory: %s\n", absOutputDir)
+		fmt.Println()
+
+		var result *backup.Result
+
+		// Create backup based on type
+		switch backupType {
+		case "postgres":
+			result, err = performPostgresBackup(absOutputDir)
+		case "files", "directory":
+			result, err = performFileBackup(absOutputDir)
+		default:
+			return fmt.Errorf("unsupported backup type: %s (supported: postgres, files)", backupType)
+		}
+
 		if err != nil {
 			// Record failure metrics
-			metrics.BackupFailure.WithLabelValues("dump_failed").Inc()
+			metrics.BackupFailure.WithLabelValues("backup_failed").Inc()
 			metrics.RecordBackupError(err)
 			return fmt.Errorf("backup failed: %w", err)
 		}
@@ -77,12 +89,12 @@ var backupCmd = &cobra.Command{
 		metrics.RecordBackupSuccess()
 
 		// Get file size for metrics
-		fileInfo, err := os.Stat(result.FilePath)
+		fileInfo, err := os.Stat(result.Path)
 		if err == nil {
 			metrics.BackupSize.Observe(float64(fileInfo.Size()))
 		}
 
-		finalPath := result.FilePath
+		finalPath := result.Path
 
 		// Encrypt backup if requested
 		if encryptBackup {
@@ -92,14 +104,14 @@ var backupCmd = &cobra.Command{
 			}
 
 			fmt.Printf("🔐 Encrypting backup...\n")
-			encryptedPath, err := encryption.EncryptFile(result.FilePath, encryptionKey)
+			encryptedPath, err := encryption.EncryptFile(result.Path, encryptionKey)
 			if err != nil {
 				metrics.BackupFailure.WithLabelValues("encryption_failed").Inc()
 				return fmt.Errorf("encryption failed: %w", err)
 			}
 
 			// Remove unencrypted file
-			if err := os.Remove(result.FilePath); err != nil {
+			if err := os.Remove(result.Path); err != nil {
 				fmt.Printf("⚠️  Warning: failed to remove unencrypted file: %v\n", err)
 			}
 
@@ -108,25 +120,90 @@ var backupCmd = &cobra.Command{
 		}
 
 		fmt.Printf("\n📦 Backup file: %s\n", finalPath)
-		fmt.Printf("⏱️  Duration: %.2fs\n", duration)
+		fmt.Printf("📊 Size: %.2f MB", float64(result.Size)/(1024*1024))
+		if result.CompressionPct > 0 {
+			fmt.Printf(" (%.1f%% compression)", result.CompressionPct)
+		}
+		fmt.Printf("\n⏱️  Duration: %.2fs\n", duration)
 
 		return nil
 	},
 }
 
+func performPostgresBackup(outputDir string) (*backup.Result, error) {
+	if dbName == "" {
+		return nil, fmt.Errorf("--db-name is required for postgres backup")
+	}
+
+	config := backup.PostgresConfig{
+		Host:     dbHost,
+		Port:     dbPort,
+		User:     dbUser,
+		Password: dbPassword,
+		Database: dbName,
+	}
+
+	legacyResult, err := backup.DumpPostgres(config, backupName, outputDir)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert legacy result to new format
+	return &backup.Result{
+		Type:         backup.TypePostgreSQL,
+		Path:         legacyResult.FilePath,
+		Size:         legacyResult.CompressedSize,
+		OriginalSize: legacyResult.OriginalSize,
+		Duration:     legacyResult.Duration,
+		DatabaseName: dbName,
+		Timestamp:    time.Now(),
+	}, nil
+}
+
+func performFileBackup(outputDir string) (*backup.Result, error) {
+	if len(backupSources) == 0 {
+		return nil, fmt.Errorf("--source is required for files backup (can be specified multiple times)")
+	}
+
+	fileBackup := &backup.FileBackup{
+		Name:            backupName,
+		Sources:         backupSources,
+		ExcludePatterns: excludePatterns,
+	}
+
+	if err := fileBackup.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid file backup configuration: %w", err)
+	}
+
+	// Generate output filename
+	timestamp := time.Now().Format("20060102-150405")
+	outputPath := filepath.Join(outputDir, fmt.Sprintf("%s-%s.tar.gz", backupName, timestamp))
+
+	// Ensure output directory exists
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create output directory: %w", err)
+	}
+
+	return fileBackup.Backup(outputPath)
+}
+
 func init() {
 	rootCmd.AddCommand(backupCmd)
 
-	backupCmd.Flags().StringVar(&backupSource, "source", "postgres", "Backup source type (postgres|filesystem)")
+	backupCmd.Flags().StringVar(&backupType, "type", "postgres", "Backup type: postgres, files, mysql")
 	backupCmd.Flags().StringVar(&backupName, "name", "", "Backup name (required)")
 	backupCmd.MarkFlagRequired("name")
 
+	// PostgreSQL flags
 	backupCmd.Flags().StringVar(&dbHost, "db-host", "localhost", "PostgreSQL host")
 	backupCmd.Flags().IntVar(&dbPort, "db-port", 5432, "PostgreSQL port")
 	backupCmd.Flags().StringVar(&dbUser, "db-user", "postgres", "PostgreSQL user")
 	backupCmd.Flags().StringVar(&dbPassword, "db-password", "", "PostgreSQL password")
-	backupCmd.Flags().StringVar(&dbName, "db-name", "", "PostgreSQL database name (required)")
-	backupCmd.MarkFlagRequired("db-name")
+	backupCmd.Flags().StringVar(&dbName, "db-name", "", "PostgreSQL database name (required for postgres type)")
+
+	// File backup flags
+	backupCmd.Flags().StringSliceVar(&backupSources, "source", []string{}, "Source files/directories to backup (can be specified multiple times)")
+	backupCmd.Flags().StringSliceVar(&excludePatterns, "exclude", []string{}, "Patterns to exclude (e.g., *.log, tmp/*)")
 
 	backupCmd.Flags().StringVar(&outputDir, "output", "./backups", "Output directory for backups")
 

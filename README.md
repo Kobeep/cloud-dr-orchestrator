@@ -1,51 +1,242 @@
-# Cloud DR Orchestrator
+<div align="center">
 
-Multi-cloud Disaster Recovery Orchestrator with Oracle Cloud Free Tier
+# 🌩️ Cloud DR Orchestrator
 
-## Overview
+[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://golang.org)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Oracle Cloud](https://img.shields.io/badge/Oracle%20Cloud-Free%20Tier-F80000?style=flat&logo=oracle)](https://www.oracle.com/cloud/free/)
+[![Terraform](https://img.shields.io/badge/Terraform-1.0+-7B42BC?style=flat&logo=terraform)](https://www.terraform.io/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-Cloud DR Orchestrator is a tool for automated PostgreSQL database backups with Oracle Cloud Object Storage integration. Built with Go, it provides a simple CLI for creating compressed backups and managing them in the cloud.
+**🚀 Production-Ready Multi-Purpose Disaster Recovery with Oracle Cloud Free Tier**
 
-## Features
+*Automated backups • Databases & Files • Encryption • Monitoring • Zero-cost infrastructure*
 
-✅ **PostgreSQL Backup** - Automated database dumps with compression
-✅ **Oracle Cloud Integration** - Upload, download, and list backups in OCI Object Storage
-✅ **Compression** - tar.gz compression to save space
-✅ **Organization** - Automatic date-based folder structure (backups/YYYY/MM/)
-✅ **Free Tier** - Uses Oracle Cloud Free Tier (20GB storage, 50k API calls/month)
+[Features](#-features) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Contributing](#-contributing)
 
-## Quick Start
+---
 
-### Prerequisites
+<img src="https://raw.githubusercontent.com/Kobeep/cloud-dr-orchestrator/main/docs/images/architecture.svg" alt="Architecture" width="800">
 
-- Go 1.21+
-- PostgreSQL client tools (`pg_dump`)
-- Oracle Cloud account with Object Storage bucket
-- OCI credentials configured in `~/.oci/config`
+<sub>Built with ❤️ using Go, Terraform, Oracle Cloud, and Prometheus</sub>
 
-### Installation
+</div>
+
+---
+
+## 📖 Overview
+
+**Cloud DR Orchestrator** is a production-grade disaster recovery solution for **databases and file systems**, leveraging Oracle Cloud's generous **Free Tier** (20GB storage, 50k API calls/month). Perfect for backing up:
+
+- 🗄️ **PostgreSQL databases** - Full dumps with compression
+- 📁 **Application configs** - Nginx, Apache, app settings
+- 🔧 **System files** - SSL certificates, SSH keys, scripts
+- 📂 **User data** - Documents, logs, any files/directories
+- 🔜 **MySQL databases** (coming soon)
+
+### Why Cloud DR Orchestrator?
+
+- 💰 **$0/month** - Runs entirely on Oracle Cloud Free Tier
+- 🎯 **Multi-purpose** - Databases, files, configs - all in one tool
+- 🔐 **AES-256-GCM** encryption for data at rest
+- 📊 **Prometheus metrics** + Grafana dashboards included
+- 🤖 **Automated scheduling** with Cronify integration
+- 🏗️ **Infrastructure as Code** - Full Terraform setup
+- 🎯 **Production tested** - Used in real-world applications
+
+---
+
+## ✨ Features
+
+<table>
+<tr>
+<td width="50%">
+
+### 🗄️ Database Backup
+
+- PostgreSQL automated dumps
+- MySQL support (coming soon)
+- Custom naming schemes
+- Date-based organization
+- Multiple database support
+
+### ☁️ Cloud Integration
+
+- Oracle Cloud Object Storage
+- 20GB Free Tier storage
+- 50k API calls/month
+- Automatic folder structure
+- Upload/download/list operations
+
+</td>
+<td width="50%">
+
+### 🔐 Security & Encryption
+
+- AES-256-GCM encryption
+- PBKDF2 key derivation
+- 100k iterations
+- Per-file salt & nonce
+- Environment variable keys
+
+### 📊 Monitoring & Observability
+
+- Prometheus metrics
+- Grafana dashboards
+- Alloy integration
+- Backup/restore duration
+- Success/failure tracking
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 📁 File & Directory Backup
+
+- Generic file backup
+- Directory recursion
+- Exclude patterns (*.log, tmp/*)
+- Config file backups
+- SSL certificates, SSH keys
+- Application data
+
+</td>
+<td width="50%">
+
+### 🤖 Automation
+- Cronify integration
+- YAML-based schedules
+- Daily/weekly/monthly
+- Conflict detection
+- Dry-run mode
+
+</td>
+<td width="50%">
+
+### 🏗️ Infrastructure as Code
+- Full Terraform setup
+- Oracle Cloud provider
+- Object Storage bucket
+- IAM policies
+- One-command deploy
+
+</td>
+</tr>
+</table>
+
+---
+
+---
+
+## 🚀 Quick Start
+
+### 📋 Prerequisites
+
+Before you begin, ensure you have:
+
+- ✅ Go 1.21 or higher
+- ✅ PostgreSQL with `pg_dump` and `pg_restore`
+- ✅ [Oracle Cloud Free Tier account](https://www.oracle.com/cloud/free/)
+- ✅ OCI credentials in `~/.oci/config`
+- ✅ (Optional) [Cronify](https://github.com/Kobeep/Cronify) for automated schedules
+
+### 📦 Installation
+
+**Option 1: Build from source**
 
 ```bash
-# Build the binary
-go build -o bin/orchestrator ./cmd/orchestrator
+git clone https://github.com/Kobeep/cloud-dr-orchestrator.git
+cd cloud-dr-orchestrator
+go build -o orchestrator ./cmd/orchestrator
+sudo mv orchestrator /usr/local/bin/
+```
 
-# Or install directly
+**Option 2: Go install**
+
+```bash
 go install github.com/Kobeep/cloud-dr-orchestrator/cmd/orchestrator@latest
 ```
 
-### Usage
+**Option 3: Download binary** (coming soon)
 
-**1. Create a local backup:**
 ```bash
+# Linux
+wget https://github.com/Kobeep/cloud-dr-orchestrator/releases/latest/download/orchestrator-linux-amd64
+chmod +x orchestrator-linux-amd64
+sudo mv orchestrator-linux-amd64 /usr/local/bin/orchestrator
+```
+
+### 🏗️ Infrastructure Setup
+
+Deploy Oracle Cloud infrastructure with Terraform:
+
+```bash
+cd terraform
+terraform init
+terraform plan
+terraform apply
+```
+
+This creates:
+- Object Storage bucket (20GB Free Tier)
+- IAM policies
+- Compartment structure
+- API keys
+
+### 🎯 Basic Usage
+
+**PostgreSQL Database Backup:**
+
+```bash
+# Create database backup
 orchestrator backup \
-  --name my-backup \
-  --db-name mydb \
+  --type postgres \
+  --name prod-db \
+  --db-name myapp \
   --db-host localhost \
   --db-user postgres \
   --db-password secret
+
+# With encryption
+orchestrator backup \
+  --type postgres \
+  --name prod-db \
+  --db-name myapp \
+  --encrypt
 ```
 
-**2. Upload backup to Oracle Cloud:**
+**File & Directory Backup:**
+
+```bash
+# Backup nginx configs
+orchestrator backup \
+  --type files \
+  --name nginx-configs \
+  --source /etc/nginx \
+  --source /etc/ssl/nginx
+
+# Backup with exclusions
+orchestrator backup \
+  --type files \
+  --name app-data \
+  --source /var/www/myapp \
+  --exclude "*.log" \
+  --exclude "tmp/*" \
+  --exclude "cache/*"
+
+# Backup multiple directories
+orchestrator backup \
+  --type files \
+  --name system-configs \
+  --source /etc/systemd \
+  --source /etc/cron.d \
+  --source ~/.ssh \
+  --encrypt
+```
+
+**Upload to Oracle Cloud:**
+
 ```bash
 orchestrator upload \
   --file backup-20251209-092658.tar.gz \
@@ -490,10 +681,117 @@ Configure notifications via:
   - Comprehensive alerting rules
   - Health check endpoint
 
-## Contributing
+- ✅ **Issue #10**: Backup encryption
+  - AES-256-GCM encryption
+  - PBKDF2 key derivation (100k iterations)
+  - Key generation command
+  - Environment variable support
 
-This is a personal learning project, but suggestions and feedback are welcome! Open an issue or submit a PR.
+- ✅ **Issue #13**: Cronify integration
+  - YAML-based schedule management
+  - Automated cron deployment
+  - Schedule validation and simulation
 
-## License
+---
 
-MIT License - see LICENSE file for details
+## 🤝 Contributing
+
+We welcome contributions! Here's how you can help:
+
+<details>
+<summary>💡 Ways to Contribute</summary>
+
+- 🐛 **Report bugs** - Open an issue with reproduction steps
+- ✨ **Suggest features** - Share your ideas for improvements
+- 📝 **Improve docs** - Help make documentation clearer
+- 🔧 **Submit PRs** - Fix bugs or implement features
+- ⭐ **Star the repo** - Show your support!
+
+</details>
+
+<details>
+<summary>🔧 Development Setup</summary>
+
+```bash
+# Clone repository
+git clone https://github.com/Kobeep/cloud-dr-orchestrator.git
+cd cloud-dr-orchestrator
+
+# Install dependencies
+go mod download
+
+# Run tests
+go test ./...
+
+# Build
+go build -o orchestrator ./cmd/orchestrator
+
+# Run linter
+golangci-lint run
+```
+
+</details>
+
+### 📜 Code of Conduct
+
+Be respectful, inclusive, and collaborative. See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for details.
+
+---
+
+## 📄 License
+
+This project is licensed under the **Apache License 2.0** - see the [LICENSE](LICENSE) file for details.
+
+```
+Copyright 2024-2025 Jakub Pospieszny
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+```
+
+---
+
+## 🙏 Acknowledgments
+
+<table>
+<tr>
+<td align="center" width="25%">
+<img src="https://www.oracle.com/a/ocom/img/rh02-free-tier.png" width="100"><br>
+<b>Oracle Cloud</b><br>
+<sub>Free Tier Infrastructure</sub>
+</td>
+<td align="center" width="25%">
+<img src="https://www.terraform.io/assets/images/og-image-8b3e4f7d.png" width="100"><br>
+<b>Terraform</b><br>
+<sub>Infrastructure as Code</sub>
+</td>
+<td align="center" width="25%">
+<img src="https://prometheus.io/assets/prometheus_logo_grey.svg" width="100"><br>
+<b>Prometheus</b><br>
+<sub>Metrics & Monitoring</sub>
+</td>
+<td align="center" width="25%">
+<img src="https://grafana.com/static/img/menu/grafana2.svg" width="100"><br>
+<b>Grafana</b><br>
+<sub>Dashboards & Alerts</sub>
+</td>
+</tr>
+</table>
+
+### Special Thanks
+
+- **[Cronify](https://github.com/Kobeep/Cronify)** - YAML-based cron management
+- **PostgreSQL Community** - Excellent database and tools
+- **Go Community** - Amazing language and ecosystem
+
+---
+
+<div align="center">
+
+**⭐ Star this repo if you find it useful! ⭐**
+
+Made with ❤️ by [Jakub Pospieszny](https://github.com/Kobeep)
+
+[Report Bug](https://github.com/Kobeep/cloud-dr-orchestrator/issues) • [Request Feature](https://github.com/Kobeep/cloud-dr-orchestrator/issues) • [Documentation](https://github.com/Kobeep/cloud-dr-orchestrator/wiki)
+
+</div>
