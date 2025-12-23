@@ -16,7 +16,7 @@
 
 ---
 
-<img src="https://raw.githubusercontent.com/Kobeep/cloud-dr-orchestrator/main/docs/images/architecture.svg" alt="Architecture" width="800">
+<img src="docs/images/architecture.svg" alt="Architecture" width="800">
 
 <sub>Built with ❤️ using Go, Terraform, Oracle Cloud, and Prometheus</sub>
 
