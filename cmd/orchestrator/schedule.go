@@ -187,6 +187,14 @@ func runValidate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("file does not exist: %s", scheduleFile)
 	}
 
+	// Perform additional YAML validation
+	fmt.Println("📄 Checking YAML syntax...")
+	if err := validateYAMLSyntax(scheduleFile); err != nil {
+		return fmt.Errorf("YAML validation failed: %w", err)
+	}
+	fmt.Println("✅ YAML syntax is valid")
+	fmt.Println()
+
 	// Build cronify command
 	cronifyArgs := []string{"--file", scheduleFile}
 	if scheduleSimulate {
@@ -219,11 +227,19 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("file does not exist: %s", scheduleFile)
 	}
 
+	// Validate YAML before deployment
+	fmt.Println("📄 Validating YAML...")
+	if err := validateYAMLSyntax(scheduleFile); err != nil {
+		return fmt.Errorf("YAML validation failed: %w", err)
+	}
+	fmt.Println("✅ YAML is valid")
+	fmt.Println()
+
 	// Build cronify command
 	cronifyArgs := []string{"--deploy", scheduleFile}
 	if scheduleDryRun {
 		cronifyArgs = append(cronifyArgs, "--simulate")
-		fmt.Println("🔎 Dry-run mode: Preview only, no changes will be made\n")
+		fmt.Println("🔎 Dry-run mode: Preview only, no changes will be made")
 	}
 
 	// Run cronify deployment
@@ -247,4 +263,91 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 func isCronifyInstalled() bool {
 	_, err := exec.LookPath("cronify")
 	return err == nil
+}
+
+// validateYAMLSyntax performs comprehensive YAML validation
+func validateYAMLSyntax(filePath string) error {
+	// Read file
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Parse YAML
+	var yamlContent map[string]interface{}
+	if err := yaml.Unmarshal(data, &yamlContent); err != nil {
+		return fmt.Errorf("invalid YAML syntax: %w", err)
+	}
+
+	// Check required fields
+	jobs, ok := yamlContent["jobs"]
+	if !ok {
+		return fmt.Errorf("missing required field: 'jobs'")
+	}
+
+	jobsList, ok := jobs.([]interface{})
+	if !ok {
+		return fmt.Errorf("'jobs' must be a list")
+	}
+
+	if len(jobsList) == 0 {
+		return fmt.Errorf("no jobs defined in schedule")
+	}
+
+	// Validate each job
+	for i, job := range jobsList {
+		jobMap, ok := job.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("job %d: invalid format", i+1)
+		}
+
+		// Check required job fields
+		requiredFields := []string{"name", "schedule", "command"}
+		for _, field := range requiredFields {
+			if _, exists := jobMap[field]; !exists {
+				return fmt.Errorf("job %d (%v): missing required field '%s'", i+1, jobMap["name"], field)
+			}
+		}
+
+		// Validate schedule format (basic check for cron expression)
+		schedule, ok := jobMap["schedule"].(string)
+		if !ok {
+			return fmt.Errorf("job %d (%v): schedule must be a string", i+1, jobMap["name"])
+		}
+
+		if err := validateCronExpression(schedule); err != nil {
+			return fmt.Errorf("job %d (%v): %w", i+1, jobMap["name"], err)
+		}
+
+		// Validate command is not empty
+		command, ok := jobMap["command"].(string)
+		if !ok {
+			return fmt.Errorf("job %d (%v): command must be a string", i+1, jobMap["name"])
+		}
+		if command == "" {
+			return fmt.Errorf("job %d (%v): command cannot be empty", i+1, jobMap["name"])
+		}
+	}
+
+	return nil
+}
+
+// validateCronExpression performs basic cron expression validation
+func validateCronExpression(expr string) error {
+	// Split cron expression
+	fields := []rune(expr)
+	spaceCount := 0
+	for _, char := range fields {
+		if char == ' ' {
+			spaceCount++
+		}
+	}
+
+	// Cron expressions should have 5 fields (minute hour day month weekday)
+	// or 6 fields if including year
+	if spaceCount < 4 || spaceCount > 5 {
+		return fmt.Errorf("invalid cron expression format: '%s' (expected 5 or 6 fields)", expr)
+	}
+
+	return nil
 }

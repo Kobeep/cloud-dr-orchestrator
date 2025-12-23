@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/schollz/progressbar/v3"
 )
 
 // FileBackup handles generic file and directory backups
@@ -36,6 +38,14 @@ func (fb *FileBackup) Validate() error {
 func (fb *FileBackup) Backup(outputPath string) (*Result, error) {
 	startTime := time.Now()
 
+	// First pass: count total files to backup
+	fmt.Println("📊 Scanning files...")
+	totalFilesToBackup, err := fb.countFiles()
+	if err != nil {
+		return nil, fmt.Errorf("failed to count files: %w", err)
+	}
+	fmt.Printf("Found %d files to backup\n\n", totalFilesToBackup)
+
 	// Create output file
 	outFile, err := os.Create(outputPath)
 	if err != nil {
@@ -53,6 +63,22 @@ func (fb *FileBackup) Backup(outputPath string) (*Result, error) {
 
 	var totalFiles int64
 	var totalSize int64
+
+	// Create progress bar
+	bar := progressbar.NewOptions64(
+		totalFilesToBackup,
+		progressbar.OptionSetDescription("📦 Backing up files"),
+		progressbar.OptionSetWidth(40),
+		progressbar.OptionShowCount(),
+		progressbar.OptionShowIts(),
+		progressbar.OptionSetTheme(progressbar.Theme{
+			Saucer:        "=",
+			SaucerHead:    ">",
+			SaucerPadding: " ",
+			BarStart:      "[",
+			BarEnd:        "]",
+		}),
+	)
 
 	// Add each source to archive
 	for _, source := range fb.Sources {
@@ -89,15 +115,16 @@ func (fb *FileBackup) Backup(outputPath string) (*Result, error) {
 				if err != nil {
 					return fmt.Errorf("failed to open file: %w", err)
 				}
-				defer file.Close()
 
 				written, err := io.Copy(tarWriter, file)
+				file.Close() // Close immediately after copying
 				if err != nil {
 					return fmt.Errorf("failed to copy file contents: %w", err)
 				}
 
 				totalFiles++
 				totalSize += written
+				bar.Add(1)
 			}
 
 			return nil
@@ -107,6 +134,9 @@ func (fb *FileBackup) Backup(outputPath string) (*Result, error) {
 			return nil, fmt.Errorf("failed to walk source %s: %w", source, err)
 		}
 	}
+
+	bar.Finish()
+	fmt.Println() // Add newline after progress bar
 
 	duration := time.Since(startTime)
 
@@ -134,10 +164,46 @@ func (fb *FileBackup) Backup(outputPath string) (*Result, error) {
 	}, nil
 }
 
+// countFiles counts total number of files to backup (for progress bar)
+func (fb *FileBackup) countFiles() (int64, error) {
+	var count int64
+	for _, source := range fb.Sources {
+		err := filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+
+			// Check if should be excluded
+			if fb.shouldExclude(path) {
+				if info.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+
+			// Count only files, not directories
+			if !info.IsDir() {
+				count++
+			}
+			return nil
+		})
+		if err != nil {
+			return 0, err
+		}
+	}
+	return count, nil
+}
+
 // shouldExclude checks if a path matches any exclude pattern
 func (fb *FileBackup) shouldExclude(path string) bool {
 	for _, pattern := range fb.ExcludePatterns {
-		matched, err := filepath.Match(pattern, filepath.Base(path))
+		// Try matching full path first
+		matched, err := filepath.Match(pattern, path)
+		if err == nil && matched {
+			return true
+		}
+		// Also try matching just the base name for simple patterns like "*.log"
+		matched, err = filepath.Match(pattern, filepath.Base(path))
 		if err == nil && matched {
 			return true
 		}
