@@ -53,15 +53,28 @@
 <td width="50%">
 
 ### 🗄️ Database Backup
-
 - PostgreSQL automated dumps
 - MySQL support (coming soon)
 - Custom naming schemes
 - Date-based organization
 - Multiple database support
 
-### ☁️ Cloud Integration
+</td>
+<td width="50%">
 
+### 🔐 Security & Encryption
+- AES-256-GCM encryption
+- PBKDF2 key derivation
+- 100k iterations
+- Per-file salt & nonce
+- Environment variable keys
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### ☁️ Cloud Integration
 - Oracle Cloud Object Storage
 - 20GB Free Tier storage
 - 50k API calls/month
@@ -71,16 +84,7 @@
 </td>
 <td width="50%">
 
-### 🔐 Security & Encryption
-
-- AES-256-GCM encryption
-- PBKDF2 key derivation
-- 100k iterations
-- Per-file salt & nonce
-- Environment variable keys
-
 ### 📊 Monitoring & Observability
-
 - Prometheus metrics
 - Grafana dashboards
 - Alloy integration
@@ -93,7 +97,6 @@
 <td width="50%">
 
 ### 📁 File & Directory Backup
-
 - Generic file backup
 - Directory recursion
 - Exclude patterns (*.log, tmp/*)
@@ -112,6 +115,8 @@
 - Dry-run mode
 
 </td>
+</tr>
+<tr>
 <td width="50%">
 
 ### 🏗️ Infrastructure as Code
@@ -120,6 +125,11 @@
 - Object Storage bucket
 - IAM policies
 - One-command deploy
+
+</td>
+<td width="50%">
+
+<!-- Pusta komórka dla zachowania struktury 2-kolumnowej -->
 
 </td>
 </tr>
